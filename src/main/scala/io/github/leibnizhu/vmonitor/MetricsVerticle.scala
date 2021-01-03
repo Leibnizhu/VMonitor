@@ -20,21 +20,25 @@ class MetricsVerticle extends AbstractVerticle {
     log.info("======>启动:{},配置:{}", Array(getClass.getName, config()): _*)
     this.sd = vertx.sharedData()
     this.env = config().getString(ENVIRONMENT_CONFIG_KEY)
+    initRules(startPromise)
+    startPromise.complete()
+  }
+
+  private def initRules(startPromise: Promise[Void]): Unit = {
     val ruleStr = config().getString(ALERT_RULE_CONFIG_KEY)
     if (StringUtils.isBlank(ruleStr)) {
       startPromise.fail("告警规则不能为空!配置key:" + ALERT_RULE_CONFIG_KEY)
     }
     val ruleList = AlertRule.fromListJson(ruleStr)
     ruleList.foreach(registerAlertRule)
-    startPromise.complete()
   }
 
   private def registerAlertRule(rule: AlertRule) = {
     val periodicMs = rule.checkPeriodMs
-    val fsm = new AlertCheckFsm(rule, env, sd).init()
+    val fsm = new AlertCheckFsm(rule, sd).init()
     vertx.setPeriodic(periodicMs, _ => {
       val satisfiedAlertCond = rule.satisfiedAlertCondition(metricRegistry)
-      fsm.check(satisfiedAlertCond)
+      fsm.check(satisfiedAlertCond).onSuccess(if (_) rule.doAlert(env, vertx))
     })
   }
 

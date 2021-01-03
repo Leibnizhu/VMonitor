@@ -3,10 +3,16 @@ package io.github.leibnizhu.vmonitor
 import com.codahale.metrics.MetricRegistry
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.core.JsonParser
+import com.fasterxml.jackson.core.`type`.TypeReference
 import com.fasterxml.jackson.databind.{ObjectMapper, ObjectReader}
-import com.fasterxml.jackson.module.scala.{DefaultScalaModule, ScalaObjectMapper}
+import com.fasterxml.jackson.module.scala.{DefaultScalaModule, JsonScalaEnumeration, ScalaObjectMapper}
+import io.github.leibnizhu.vmonitor.AlertMethod.{AlertMethod, Log, WecomBot}
+import io.github.leibnizhu.vmonitor.Constants.SEND_WECOM_BOT_EVENTBUS_ADDR
 import io.github.leibnizhu.vmonitor.util.TimeUtil
-import io.vertx.core.Future
+import io.github.leibnizhu.vmonitor.wecom.message.MarkdownMessage
+import io.github.leibnizhu.vmonitor.wecom.message.MarkdownMessage.MarkdownBuilder
+import io.vertx.core.{Future, Vertx}
+import org.slf4j.LoggerFactory
 
 /**
  * @author Leibniz on 2020/12/31 3:20 PM
@@ -16,6 +22,7 @@ case class AlertRule(@JsonProperty(required = true) name: String,
                      @JsonProperty(required = true) period: CheckPeriod,
                      @JsonProperty(required = true) condition: AlertCondition,
                      @JsonProperty(required = true) alert: AlertMode) {
+  private val log = LoggerFactory.getLogger(getClass)
   lazy val checkPeriodMs: Long = TimeUtil.parseTimeStrToMs(period.every)
   lazy val pendingMs: Long = TimeUtil.parseTimeStrToMs(period.pend)
   lazy val alertIntervalMs: Long = TimeUtil.parseTimeStrToMs(alert.interval)
@@ -28,10 +35,24 @@ case class AlertRule(@JsonProperty(required = true) name: String,
     metricRegistry.counter(metric).getCount > 3
   }
 
-  def doAlert(env: String): Future[Unit] = {
-    //TODO 根据 AlertMode 处理
-    System.out.println("===============>" + env + "环境发出告警")
-    Future.succeededFuture()
+  def doAlert(env: String, vertx: Vertx): Future[Unit] = {
+    //根据 AlertMode 处理
+    alert.method match {
+      case WecomBot =>
+        val token = alert.config("token")
+        val customMsg = alert.config("message")
+        //TODO 完善报警信息，包括具体报错情况
+        val messageBuilder = new MarkdownBuilder()
+          .text(env).text("环境的\"").text(name).text("\"规则发出告警:").newLine()
+        if (customMsg != null) {
+          messageBuilder.text(customMsg)
+        }
+        val wecomMsgJson = MarkdownMessage(token, messageBuilder.toMarkdownString).serializeToJsonObject()
+        vertx.eventBus().request(SEND_WECOM_BOT_EVENTBUS_ADDR, wecomMsgJson).mapEmpty()
+      case Log =>
+        log.warn("===============>{}环境的{}规则发出告警", Array(env, name): _*)
+        Future.succeededFuture()
+    }
   }
 }
 
@@ -47,13 +68,19 @@ object AlertRule {
 }
 
 case class CheckPeriod(@JsonProperty(required = true) every: String,
-                       @JsonProperty(required = true) pend: String) {
-}
+                       @JsonProperty(required = true) pend: String)
 
-case class AlertMode(@JsonProperty(required = true) method: String,
+case class AlertMode(@JsonProperty(required = true) @JsonScalaEnumeration(classOf[AlertMethodType]) method: AlertMethod,
                      @JsonProperty(required = true) times: Int,
                      @JsonProperty(required = true) interval: String,
                      @JsonProperty(required = true) config: Map[String, String])
 
 case class AlertCondition(@JsonProperty(required = true) method: String,
                           @JsonProperty(required = true) param: Map[String, String])
+
+object AlertMethod extends Enumeration {
+  type AlertMethod = Value
+  val WecomBot, Log = Value
+}
+
+class AlertMethodType extends TypeReference[AlertMethod.type]

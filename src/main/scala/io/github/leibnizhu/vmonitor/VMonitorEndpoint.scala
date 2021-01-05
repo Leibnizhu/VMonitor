@@ -1,7 +1,7 @@
 package io.github.leibnizhu.vmonitor
 
 import com.hazelcast.config.Config
-import io.github.leibnizhu.vmonitor.Constants.{ALERT_RULE_CONFIG_KEY, ENVIRONMENT_CONFIG_KEY, LISTEN_ADDRESS_CONFIG_KEY}
+import io.github.leibnizhu.vmonitor.Constants.{ALERT_RULE_CONFIG_KEY, ENVIRONMENT_CONFIG_KEY, EVENTBUS_MONITOR_JSON_PARAM_METRIC_NAME, LISTEN_ADDRESS_CONFIG_KEY}
 import io.github.leibnizhu.vmonitor.wecom.SendWecomBotVerticle
 import io.vertx.core._
 import io.vertx.core.eventbus.Message
@@ -53,10 +53,11 @@ class VMonitorEndpoint(address: String, env: String = "default", ruleStr: String
     vertx.close(stopPromise)
   }
 
-  override def collect(message: JsonObject): Unit = {
+  override def collect(metricName: String, message: JsonObject): Unit = {
     if (vertx == null) {
       throw new IllegalStateException("vertx is not initialized!!!")
     }
+    message.put(EVENTBUS_MONITOR_JSON_PARAM_METRIC_NAME, metricName)
     vertx.eventBus().request(address, message)
       .onSuccess((msg: Message[JsonObject]) => {
         if (msg.body() != null)

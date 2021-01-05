@@ -18,7 +18,18 @@ public class JavaEntranceTest {
         VMonitor endpoint1 = runOne(ruleStr);
         TimeUnit.SECONDS.sleep(10);
         VMonitor endpoint2 = runOne(ruleStr);
-        TimeUnit.MINUTES.sleep(6);
+        TimeUnit.MINUTES.sleep(2);
+        endpoint2.stop();
+        for (int i = 0; i < 5; i++) {
+            endpoint1.collect("serv-etl.SchedulerError", new JsonObject());
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+        endpoint2.start();
+        TimeUnit.MINUTES.sleep(2);
         endpoint1.stop();
         endpoint2.stop();
     }
@@ -30,7 +41,7 @@ public class JavaEntranceTest {
         promise.future()
                 .onSuccess(v -> {
                     for (int i = 0; i < 10; i++) {
-                        endpoint.collect(new JsonObject().put(Constants$.MODULE$.EVENTBUS_MONITOR_JSON_PARAM_METRIC_NAME(), "serv-etl.SchedulerError"));
+                        endpoint.collect("serv-etl.SchedulerError", new JsonObject());
                         try {
                             Thread.sleep(100);
                         } catch (InterruptedException e) {

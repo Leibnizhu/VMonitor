@@ -36,11 +36,8 @@ class EventCollectorVerticle extends AbstractVerticle {
           if (metricName == null || metricName.isEmpty) {
             msg.reply(new JsonObject().put("errMsg", "监听请求的指标名为空"))
           } else {
-            //TODO 不同的metric，根据condition，有不同的统计策略
-            metricAlertRuleMap(metricName).foreach(rule => {
-              rule
-            })
-            metricRegistry.counter(metricName).inc()
+            //不同的metric，根据condition，有不同的统计策略
+            metricAlertRuleMap(metricName).foreach(_.recordMetric(jsonBody, metricRegistry))
             msg.reply(null)
           }
         }
@@ -52,7 +49,7 @@ class EventCollectorVerticle extends AbstractVerticle {
     if (StringUtils.isBlank(ruleStr)) {
       startPromise.fail("告警规则不能为空!配置key:" + ALERT_RULE_CONFIG_KEY)
     }
-    metricAlertRuleMap = AlertRule.fromListJson(ruleStr).groupBy(_.metric)
+    metricAlertRuleMap = AlertRule.fromListJson(ruleStr).groupBy(_.metric.name)
   }
 
   override def stop(): Unit = {

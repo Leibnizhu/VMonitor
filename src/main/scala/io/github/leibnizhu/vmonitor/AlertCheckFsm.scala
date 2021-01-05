@@ -1,6 +1,7 @@
 package io.github.leibnizhu.vmonitor
 
 import io.github.leibnizhu.vmonitor.AlertStatus.{Alert, AlertPending, AlertStatus, Normal, NormalPending}
+import io.github.leibnizhu.vmonitor.NeedAlert.{AlertBegin, AlertEnd, NeedAlert, NoNeed}
 import io.vertx.core.shareddata.{AsyncMap, SharedData}
 import io.vertx.core.{AsyncResult, Future, Promise}
 import org.slf4j.LoggerFactory
@@ -24,25 +25,25 @@ class AlertCheckFsm(rule: AlertRule, sd: SharedData) {
     this
   }
 
-  def check(satisfiedCondition: Boolean): Future[Boolean] = {
-    val needAlertPromise = Promise.promise[Boolean]()
+  def check(satisfiedCondition: Boolean): Future[NeedAlert] = {
+    val needAlertPromise = Promise.promise[NeedAlert]()
     sd.getLocalLock(rule.alertFsmLockName)
       .onSuccess(lock => {
-        val processedPromise = Promise.promise[Boolean]()
+        val processedPromise = Promise.promise[NeedAlert]()
         doCheck(satisfiedCondition, processedPromise)
         processedPromise.future().onComplete(ar => {
-          needAlertPromise.complete(ar.succeeded() && ar.result())
+          needAlertPromise.complete(if (ar.succeeded()) ar.result() else NoNeed)
           lock.release()
         })
       })
       .onFailure(e => {
         log.error(s"获取${rule.alertFsmLockName}的分布式锁失败:${e.getMessage}", e)
-        needAlertPromise.complete(false)
+        needAlertPromise.complete(NoNeed)
       })
     needAlertPromise.future()
   }
 
-  private def doCheck(satisfiedCondition: Boolean, promise: Promise[Boolean]): Unit = {
+  private def doCheck(satisfiedCondition: Boolean, promise: Promise[NeedAlert]): Unit = {
     sd.getAsyncMap(rule.alertFsmMapName)
       .onSuccess((asyncMap: AsyncMap[String, AnyRef]) => {
         asyncMap.get(statusMapKey)
@@ -56,7 +57,7 @@ class AlertCheckFsm(rule: AlertRule, sd: SharedData) {
               }
             case statusObj =>
               log.error("不支持的状态类型:" + statusObj)
-              promise.complete(false)
+              promise.complete(NoNeed)
           }
           .onFailure(e => {
             log.error(s"获取${rule.alertFsmMapName}的异步Map的${statusMapKey}属性失败:${e.getMessage}", e)
@@ -69,18 +70,18 @@ class AlertCheckFsm(rule: AlertRule, sd: SharedData) {
       })
   }
 
-  private def processNormal(satisfiedCondition: Boolean, asyncMap: AsyncMap[String, AnyRef], promise: Promise[Boolean]) = {
+  private def processNormal(satisfiedCondition: Boolean, asyncMap: AsyncMap[String, AnyRef], promise: Promise[NeedAlert]) = {
     if (satisfiedCondition) {
       log.info("规则{}在Normal状态触发警报条件,进入AlertPending状态", rule.name)
       asyncMap.put(statusMapKey, AlertPending)
         .compose(_ => asyncMap.put(startPendingTimeMapKey, Long.box(System.currentTimeMillis())))
         .onComplete(defaultCompleter(_, promise))
     } else {
-      promise.complete(false)
+      promise.complete(NoNeed)
     }
   }
 
-  private def processAlertPending(satisfiedCondition: Boolean, asyncMap: AsyncMap[String, AnyRef], promise: Promise[Boolean]) = {
+  private def processAlertPending(satisfiedCondition: Boolean, asyncMap: AsyncMap[String, AnyRef], promise: Promise[NeedAlert]) = {
     if (satisfiedCondition) {
       asyncMap.get(startPendingTimeMapKey)
         .onSuccess(startPendingTime => if (System.currentTimeMillis() - startPendingTime.asInstanceOf[Long] > rule.pendingMs) {
@@ -88,10 +89,9 @@ class AlertCheckFsm(rule: AlertRule, sd: SharedData) {
           asyncMap.put(statusMapKey, Alert)
             .compose(_ => asyncMap.put(alertedCountMapKey, Int.box(1)))
             .compose(_ => asyncMap.put(lastAlertTimeMapKey, Long.box(System.currentTimeMillis())))
-            //            .compose(_ => rule.doAlert(env))
-            .onComplete(defaultCompleter(_, promise, result = true))
+            .onComplete(defaultCompleter(_, promise, AlertBegin))
         } else {
-          promise.complete(false)
+          promise.complete(NoNeed)
         })
         .onFailure(e => {
           log.error(s"获取${rule.alertFsmMapName}的异步Map的${startPendingTimeMapKey}属性失败:${e.getMessage}", e)
@@ -104,7 +104,7 @@ class AlertCheckFsm(rule: AlertRule, sd: SharedData) {
     }
   }
 
-  private def processNormalPending(satisfiedCondition: Boolean, asyncMap: AsyncMap[String, AnyRef], promise: Promise[Boolean]) = {
+  private def processNormalPending(satisfiedCondition: Boolean, asyncMap: AsyncMap[String, AnyRef], promise: Promise[NeedAlert]) = {
     if (satisfiedCondition) {
       log.info("规则{}在NormalPending状态由于在{}时间内又满足告警条件,恢复到Alert状态", Array(rule.name, rule.period.pend): _*)
       asyncMap.put(statusMapKey, Alert)
@@ -116,7 +116,9 @@ class AlertCheckFsm(rule: AlertRule, sd: SharedData) {
           asyncMap.put(statusMapKey, Normal)
             .compose(_ => asyncMap.put(alertedCountMapKey, Int.box(0)))
             .compose(_ => asyncMap.put(lastAlertTimeMapKey, Long.box(0)))
-            .onComplete(defaultCompleter(_, promise))
+            .onComplete(defaultCompleter(_, promise, AlertEnd))
+        } else {
+          promise.complete(NoNeed)
         })
         .onFailure(e => {
           log.error(s"获取${rule.alertFsmMapName}的异步Map的${startPendingTimeMapKey}属性失败:${e.getMessage}", e)
@@ -125,7 +127,7 @@ class AlertCheckFsm(rule: AlertRule, sd: SharedData) {
     }
   }
 
-  private def processAlert(satisfiedCondition: Boolean, asyncMap: AsyncMap[String, AnyRef], promise: Promise[Boolean]) = {
+  private def processAlert(satisfiedCondition: Boolean, asyncMap: AsyncMap[String, AnyRef], promise: Promise[NeedAlert]) = {
     if (satisfiedCondition) {
       asyncMap.get(alertedCountMapKey)
         .onSuccess(alertCnt => {
@@ -138,10 +140,9 @@ class AlertCheckFsm(rule: AlertRule, sd: SharedData) {
                     s"距离上次告警通知已${lastAlertInterval}ms(>${rule.alert.interval}),再次发出告警通知")
                   asyncMap.put(alertedCountMapKey, Int.box(alertCnt.asInstanceOf[Int] + 1))
                     .compose(_ => asyncMap.put(lastAlertTimeMapKey, Long.box(System.currentTimeMillis())))
-                    //                    .compose(_ => rule.doAlert(env))
-                    .onComplete(defaultCompleter(_, promise, result = true))
+                    .onComplete(defaultCompleter(_, promise, AlertBegin))
                 } else {
-                  promise.complete(false)
+                  promise.complete(NoNeed)
                 }
               })
               .onFailure(e => {
@@ -149,8 +150,8 @@ class AlertCheckFsm(rule: AlertRule, sd: SharedData) {
                 promise.fail(e)
               })
           } else {
-            log.info(s"规则'${rule.name}'在Alert状态已发出${alertCnt}次(>=${rule.alert.times})告警通知,不再通知")
-            promise.complete(false)
+            log.debug(s"规则'${rule.name}'在Alert状态已发出${alertCnt}次(>=${rule.alert.times})告警通知,不再通知")
+            promise.complete(NoNeed)
           }
         })
         .onFailure(e => {
@@ -158,7 +159,7 @@ class AlertCheckFsm(rule: AlertRule, sd: SharedData) {
           promise.fail(e)
         })
     } else {
-      log.info("规则{}在NormalPending状态由于不满足告警条件,恢复到NormalPending状态", rule.name)
+      log.info("规则{}在Alert状态由于不满足告警条件,恢复到NormalPending状态", rule.name)
       asyncMap.put(statusMapKey, NormalPending)
         .compose(_ => asyncMap.put(startPendingTimeMapKey, Long.box(System.currentTimeMillis())))
         .onComplete(defaultCompleter(_, promise))
@@ -166,7 +167,7 @@ class AlertCheckFsm(rule: AlertRule, sd: SharedData) {
   }
 
 
-  private def defaultCompleter[T](ar: AsyncResult[T], promise: Promise[Boolean], result: Boolean = false): Unit = {
+  private def defaultCompleter[T](ar: AsyncResult[T], promise: Promise[NeedAlert], result: NeedAlert = NoNeed): Unit = {
     if (ar.failed()) {
       log.error(ar.cause().getMessage, ar.cause())
     }

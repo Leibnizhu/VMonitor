@@ -26,5 +26,5 @@ trait VMonitor {
     Await.result(FutureUtil.vertxFutureToScala(promise.future()), Duration.Inf)
   }
 
-  def collect(message: JsonObject): Unit
+  def collect(metricName: String, message: JsonObject): Unit
 }

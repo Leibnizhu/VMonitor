@@ -15,10 +15,6 @@ object Constants {
   //EventBus传输监控事件的key
   val EVENTBUS_MONITOR_JSON_PARAM_METRIC_NAME = "metricName"
 
-  //HttpVerticle请求参数
-  val REQ_PARAM_WECOM_BOT_TOKEN: String = "wecomBotToken"
-  val REQ_PARAM_WECOM_BOT_TYPE: String = "wecomBotType"
-  val REQ_PARAM_MENTIONED_LIST: String = "mentionedList" //Text是手机号，Markdown是邮箱
   //企业微信机器人地址
   val WECOM_BOT_API_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key="
 

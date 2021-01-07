@@ -15,7 +15,7 @@ public class JavaEntranceTest {
     private Random rand = new Random();
 
     @Test
-    public void test() throws Exception {
+    public void clusterTest() throws Exception {
         String ruleStr = Vertx.vertx().fileSystem().readFileBlocking("rule.json").toString();
         VMonitor endpoint1 = runOne(ruleStr);
         TimeUnit.SECONDS.sleep(10);
@@ -30,14 +30,14 @@ public class JavaEntranceTest {
                 e.printStackTrace();
             }
         }
-        endpoint2.start();
+        VMonitor endpoint3 = runOne(ruleStr);
         TimeUnit.MINUTES.sleep(2);
         endpoint1.stop();
-        endpoint2.stop();
+        endpoint3.stop();
     }
 
     private VMonitor runOne(String ruleStr) {
-        VMonitor endpoint = new VMonitorEndpoint("test", "develop", ruleStr, null);
+        VMonitor endpoint = VMonitor.embedClusterVertx("test", "develop", ruleStr);
         Promise<Void> promise = Promise.promise();
         endpoint.startAsync(promise);
         promise.future()

@@ -1,8 +1,8 @@
 package io.github.leibnizhu.vmonitor
 
 import io.github.leibnizhu.vmonitor.util.FutureUtil
-import io.vertx.core.Promise
 import io.vertx.core.json.JsonObject
+import io.vertx.core.{Promise, Vertx}
 
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
@@ -27,4 +27,12 @@ trait VMonitor {
   }
 
   def collect(metricName: String, message: JsonObject): Unit
+}
+
+object VMonitor {
+  def embedClusterVertx(address: String, env: String, ruleStr: String): VMonitor =
+    new VMonitorEndpoint(address, env, ruleStr)
+
+  def specificVertx(address: String, env: String, ruleStr: String, vertx: Vertx): VMonitor =
+    new VMonitorEndpoint(address, env, ruleStr, vertx = vertx)
 }

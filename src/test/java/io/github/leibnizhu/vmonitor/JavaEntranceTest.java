@@ -5,12 +5,14 @@ import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
 import org.junit.Test;
 
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 /**
  * @author Leibniz on 2020/12/23 5:14 PM
  */
 public class JavaEntranceTest {
+    private Random rand = new Random();
 
     @Test
     public void test() throws Exception {
@@ -21,7 +23,7 @@ public class JavaEntranceTest {
         TimeUnit.MINUTES.sleep(2);
         endpoint2.stop();
         for (int i = 0; i < 5; i++) {
-            endpoint1.collect("serv-etl.SchedulerError", new JsonObject());
+            endpoint1.collect("serv-etl.SchedulerError", new JsonObject().put("cost", rand.nextInt(10)));
             try {
                 Thread.sleep(100);
             } catch (InterruptedException e) {
@@ -41,7 +43,7 @@ public class JavaEntranceTest {
         promise.future()
                 .onSuccess(v -> {
                     for (int i = 0; i < 10; i++) {
-                        endpoint.collect("serv-etl.SchedulerError", new JsonObject());
+                        endpoint.collect("serv-etl.SchedulerError", new JsonObject().put("cost", rand.nextInt(10)));
                         try {
                             Thread.sleep(100);
                         } catch (InterruptedException e) {

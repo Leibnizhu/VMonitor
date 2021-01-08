@@ -16,7 +16,8 @@
         <maven.compiler.target>1.8</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <finalName>VMonitor</finalName>
-        <scala.version>2.12.4</scala.version>
+        <scala.main.version>2.10</scala.main.version>
+        <scala.version>${scala.main.version}.5</scala.version>
         <scala-test.version>3.0.5</scala-test.version>
         <vertx.version>4.0.0</vertx.version>
         <slf4j.version>1.7.24</slf4j.version>
@@ -81,11 +82,6 @@
                 <artifactId>slf4j-api</artifactId>
                 <version>${slf4j.version}</version>
             </dependency>
-            <dependency>
-                <groupId>com.fasterxml.jackson.core</groupId>
-                <artifactId>jackson-core</artifactId>
-                <version>2.10.2</version>
-            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -93,27 +89,18 @@
         <dependency>
             <groupId>org.scala-lang</groupId>
             <artifactId>scala-library</artifactId>
+            <scope>provided</scope>
         </dependency>
 
-        <dependency>
-            <groupId>io.vertx</groupId>
-            <artifactId>vertx-web</artifactId>
-            <version>${vertx.version}</version>
-        </dependency>
         <dependency>
             <groupId>io.vertx</groupId>
             <artifactId>vertx-web-client</artifactId>
             <version>${vertx.version}</version>
         </dependency>
-        <dependency>
-            <groupId>io.vertx</groupId>
-            <artifactId>vertx-hazelcast</artifactId>
-            <version>${vertx.version}</version>
-        </dependency>
 
         <dependency>
             <groupId>io.vertx</groupId>
-            <artifactId>vertx-dropwizard-metrics</artifactId>
+            <artifactId>vertx-hazelcast</artifactId>
             <version>${vertx.version}</version>
         </dependency>
 
@@ -129,45 +116,56 @@
             </exclusions>
         </dependency>
 
-        <!--日志相关-->
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>ch.qos.logback</groupId>
-            <artifactId>logback-core</artifactId>
-            <version>${logback.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>ch.qos.logback</groupId>
-            <artifactId>logback-classic</artifactId>
-            <version>${logback.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <version>2.10.2</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.fasterxml.jackson.module</groupId>
-            <artifactId>jackson-module-scala_2.12</artifactId>
-            <version>2.10.2</version>
-        </dependency>
-
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
             <version>3.11</version>
         </dependency>
 
+        <!-- 本来直接用jackson-scala的，但是jackson带来的依赖冲突(使用方)会很麻烦，兼容性查，所以改成gson -->
+        <dependency>
+            <groupId>org.json4s</groupId>
+            <artifactId>json4s-jackson_${scala.main.version}</artifactId>
+            <version>3.2.10</version>
+        </dependency>
+
+        <!--        <dependency>-->
+        <!--            <groupId>com.fasterxml.jackson.core</groupId>-->
+        <!--            <artifactId>jackson-databind</artifactId>-->
+        <!--            <version>2.6.4</version>-->
+        <!--            <scope>provided</scope>-->
+        <!--        </dependency>-->
+
+        <!--        <dependency>-->
+        <!--            <groupId>com.fasterxml.jackson.module</groupId>-->
+        <!--            <artifactId>jackson-module-scala_${scala.main.version}</artifactId>-->
+        <!--            <version>2.7.9</version>-->
+        <!--            <scope>provided</scope>-->
+        <!--        </dependency>-->
+
+        <!--日志相关-->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-core</artifactId>
+            <version>${logback.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <version>${logback.version}</version>
+            <scope>provided</scope>
+        </dependency>
 
         <!-- 测试依赖 -->
         <dependency>
             <groupId>org.scalatest</groupId>
-            <artifactId>scalatest_2.12</artifactId>
+            <artifactId>scalatest_${scala.main.version}</artifactId>
             <version>${scala-test.version}</version>
             <scope>test</scope>
         </dependency>
@@ -245,9 +243,9 @@
                 <version>3.2.2</version>
                 <configuration>
                     <recompileMode>incremental</recompileMode>
-                    <args>
+                    <!--<args>
                         <arg>-target:jvm-1.8</arg>
-                    </args>
+                    </args>-->
                     <javacArgs>
                         <javacArg>-source</javacArg>
                         <javacArg>1.8</javacArg>

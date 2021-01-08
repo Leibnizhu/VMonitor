@@ -1,5 +1,6 @@
 package io.github.leibnizhu.vmonitor
 
+import com.hazelcast.config.Config
 import io.github.leibnizhu.vmonitor.util.FutureUtil
 import io.vertx.core.json.JsonObject
 import io.vertx.core.{Promise, Vertx}
@@ -33,6 +34,10 @@ object VMonitor {
   def embedClusterVertx(address: String, env: String, ruleStr: String): VMonitor =
     new VMonitorEndpoint(address, env, ruleStr)
 
-  def specificVertx(address: String, env: String, ruleStr: String, vertx: Vertx): VMonitor =
+  //适配java
+  def embedClusterVertx(address: String, env: String, ruleStr: String, clusterConfig: Config): VMonitor =
+    new VMonitorEndpoint(address, env, ruleStr, clusterConfig)
+
+  def specifyVertx(address: String, env: String, ruleStr: String, vertx: Vertx): VMonitor =
     new VMonitorEndpoint(address, env, ruleStr, vertx = vertx)
 }

@@ -2,6 +2,7 @@ package io.github.leibnizhu.vmonitor
 
 import com.codahale.metrics.SharedMetricRegistries
 import io.github.leibnizhu.vmonitor.Constants.{ALERT_RULE_CONFIG_KEY, EVENTBUS_MONITOR_JSON_PARAM_METRIC_NAME, LISTEN_ADDRESS_CONFIG_KEY, MAIN_METRIC_NAME}
+import io.github.leibnizhu.vmonitor.util.FutureUtil._
 import io.vertx.core.eventbus.Message
 import io.vertx.core.json.JsonObject
 import io.vertx.core.{AbstractVerticle, Promise}
@@ -35,8 +36,8 @@ class EventCollectorVerticle extends AbstractVerticle {
     //    metricAlertRuleMap = AlertRule.fromListJson(ruleStr).groupBy(_.metric.name)
     //每个规则的采样设置
     AlertRule.fromListJson(ruleStr).foreach(rule => {
-      vertx.setPeriodic(rule.sampleIntervalMs, _ => {
-        val metricBuffer = metricBufferMap.computeIfAbsent(rule.metric.name, _ => new ArrayBuffer[JsonObject]())
+      vertx.setPeriodic(rule.sampleIntervalMs, (tid: java.lang.Long) => {
+        val metricBuffer = metricBufferMap.computeIfAbsent(rule.metric.name, (k: String) => new ArrayBuffer[JsonObject]())
         val sampledList = metricBuffer.toList
         metricBuffer.clear()
         //不同的metric，根据condition，有不同的统计策略
@@ -47,7 +48,7 @@ class EventCollectorVerticle extends AbstractVerticle {
 
   private def initEventbus(): Unit = {
     val address = config().getString(LISTEN_ADDRESS_CONFIG_KEY)
-    vertx.eventBus().consumer(address)
+    vertx.eventBus().consumer[JsonObject](address)
       .handler((msg: Message[JsonObject]) => {
         log.debug("{}地址接收到eventbus消息:{}", Array(address, msg.body()): _*)
         val jsonBody = msg.body()
@@ -58,7 +59,7 @@ class EventCollectorVerticle extends AbstractVerticle {
           if (metricName == null || metricName.isEmpty) {
             log.error("监听请求的指标名为空")
           } else {
-            metricBufferMap.computeIfAbsent(metricName, _ => new ArrayBuffer[JsonObject]()).append(jsonBody)
+            metricBufferMap.computeIfAbsent(metricName, (k: String) => new ArrayBuffer[JsonObject]()).append(jsonBody)
           }
         }
       })

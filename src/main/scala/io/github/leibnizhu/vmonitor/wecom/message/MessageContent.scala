@@ -1,6 +1,7 @@
 package io.github.leibnizhu.vmonitor.wecom.message
 
 import io.github.leibnizhu.vmonitor.Constants._
+import io.github.leibnizhu.vmonitor.util.FutureUtil._
 import io.github.leibnizhu.vmonitor.wecom.message.MessageType.MessageType
 import io.vertx.core.json.JsonObject
 import org.slf4j.LoggerFactory
@@ -44,7 +45,7 @@ object MessageContent {
       case EVENTBUS_WECOM_BOT_JSON_PARAM_TYPE_TEXT =>
         if (json.getJsonArray(EVENTBUS_WECOM_BOT_JSON_PARAM_MENTION_LIST) != null) {
           val mentionListBuf = new ListBuffer[String]
-          json.getJsonArray(EVENTBUS_WECOM_BOT_JSON_PARAM_MENTION_LIST).forEach(m => mentionListBuf += m.toString)
+          json.getJsonArray(EVENTBUS_WECOM_BOT_JSON_PARAM_MENTION_LIST).forEach((m: Object) => mentionListBuf += m.toString)
           TextMessage(token, content, mentionListBuf.toList)
         } else {
           TextMessage(token, content)

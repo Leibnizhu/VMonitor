@@ -2,6 +2,7 @@ package io.github.leibnizhu.vmonitor.wecom
 
 import io.github.leibnizhu.vmonitor.Constants
 import io.github.leibnizhu.vmonitor.Constants.SEND_WECOM_BOT_EVENTBUS_ADDR
+import io.github.leibnizhu.vmonitor.util.FutureUtil._
 import io.github.leibnizhu.vmonitor.util.ResponseUtil
 import io.github.leibnizhu.vmonitor.wecom.message.MessageContent
 import io.vertx.core.buffer.Buffer
@@ -26,7 +27,7 @@ class SendWecomBotVerticle extends AbstractVerticle {
   }
 
   private def registerEventBus(): Unit = {
-    vertx.eventBus().consumer(SEND_WECOM_BOT_EVENTBUS_ADDR)
+    vertx.eventBus().consumer[JsonObject](SEND_WECOM_BOT_EVENTBUS_ADDR)
       .handler((eventBusMsg: Message[JsonObject]) =>
         Try({
           val msgContent = MessageContent.deserializeFromJsonObject(eventBusMsg.body())
@@ -43,7 +44,7 @@ class SendWecomBotVerticle extends AbstractVerticle {
 
   private def sendWecomBotMessage(token: String, reqJson: JsonObject, eventBusMsg: Message[JsonObject]): Unit = {
     val startTime = System.currentTimeMillis()
-    doSendReq(reqJson, token, sendAr => {
+    doSendReq(reqJson, token, (sendAr: AsyncResult[HttpResponse[Buffer]]) => {
       val costTime = System.currentTimeMillis() - startTime
       val responseJson = if (sendAr.succeeded()) {
         val responseStr = sendAr.result().bodyAsString()

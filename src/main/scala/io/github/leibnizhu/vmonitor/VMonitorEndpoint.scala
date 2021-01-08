@@ -2,6 +2,7 @@ package io.github.leibnizhu.vmonitor
 
 import com.hazelcast.config.Config
 import io.github.leibnizhu.vmonitor.Constants._
+import io.github.leibnizhu.vmonitor.util.FutureUtil._
 import io.github.leibnizhu.vmonitor.util.SystemUtil
 import io.github.leibnizhu.vmonitor.wecom.SendWecomBotVerticle
 import io.github.leibnizhu.vmonitor.wecom.message.MarkdownMessage
@@ -32,12 +33,12 @@ class VMonitorEndpoint(address: String, env: String = "default", ruleStr: String
       val options = new VertxOptions().setClusterManager(mgr)
         .setBlockedThreadCheckInterval(1).setBlockedThreadCheckIntervalUnit(TimeUnit.MINUTES) //设置到Vertx启动参数中
       Vertx.clusteredVertx(options)
-        .onSuccess(vertx => {
+        .onSuccess((vertx: Vertx) => {
           this.vertx = vertx
           log.info("启动集群模式的Vertx成功,deploymentIDs:{}", vertx.deploymentIDs())
           initVMonitor(vertx, startPromise, mgr)
         })
-        .onFailure(exp => {
+        .onFailure((exp: Throwable) => {
           log.error("启动集群模式的Vertx失败:" + exp.getMessage, exp)
           startPromise.fail(exp)
         })
@@ -53,14 +54,14 @@ class VMonitorEndpoint(address: String, env: String = "default", ruleStr: String
       .all(vertx.deployVerticle(classOf[EventCollectorVerticle], deployOption),
         vertx.deployVerticle(classOf[MetricsVerticle], deployOption),
         vertx.deployVerticle(classOf[SendWecomBotVerticle], deployOption))
-      .onSuccess(_ => {
+      .onSuccess((f: CompositeFuture) => {
         log.info("VMonitorEndpoint部署Verticle成功")
         this.endpoint = if (mgr == null) SystemUtil.hostName() else
           s"${SystemUtil.hostName()}@${mgr.getNodeInfo.host()}:${mgr.getNodeInfo.port()}"
         notifyAndRegisterHook(rules)
         startPromise.complete()
       })
-      .onFailure(exp => {
+      .onFailure((exp: Throwable) => {
         log.error("VMonitorEndpoint部署Verticle失败:" + exp.getMessage, exp)
         startPromise.fail(exp)
       })
@@ -93,7 +94,7 @@ class VMonitorEndpoint(address: String, env: String = "default", ruleStr: String
       val stopMarkdownStr = makeMarkdownMessage(endpoint, "warning", "关闭")
       wecomBotTokens.foreach(token => {
         val wecomMsgJson = MarkdownMessage(token, stopMarkdownStr).serializeToJsonObject()
-        vertx.eventBus().request(SEND_WECOM_BOT_EVENTBUS_ADDR, wecomMsgJson)
+        vertx.eventBus().request[JsonObject](SEND_WECOM_BOT_EVENTBUS_ADDR, wecomMsgJson)
           .onComplete((_: AsyncResult[Message[JsonObject]]) => vertx.close(stopPromise))
       })
     } else {

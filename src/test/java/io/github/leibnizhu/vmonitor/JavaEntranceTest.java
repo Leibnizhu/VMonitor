@@ -37,7 +37,7 @@ public class JavaEntranceTest {
     }
 
     private VMonitor runOne(String ruleStr) {
-        VMonitor endpoint = VMonitor.embedClusterVertx("test", "develop", ruleStr);
+        VMonitor endpoint = VMonitor$.MODULE$.embedClusterVertx("test", "develop", ruleStr);
         Promise<Void> promise = Promise.promise();
         endpoint.startAsync(promise);
         promise.future()

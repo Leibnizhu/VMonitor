@@ -1,5 +1,7 @@
 package io.github.leibnizhu.vmonitor.util
 
+import io.github.leibnizhu.vmonitor.util.FutureUtil._
+
 import java.lang.management.ManagementFactory
 import java.net.{InetAddress, UnknownHostException}
 import java.text.{DateFormat, SimpleDateFormat}

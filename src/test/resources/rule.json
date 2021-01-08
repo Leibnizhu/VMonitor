@@ -2,8 +2,8 @@
   {
     "name": "SchedulerError监控",
     "metric": {
-      "name": "serv-etl.SchedulerError",
       /*指标名，需要于代码里面写入指标的一样，建议格式类似x.y.z*/
+      "name": "serv-etl.SchedulerError",
       "filter": [],
       "groupField": [],
       "groupAggFunc": null,
@@ -19,25 +19,24 @@
       /*出现问题后进入pending状态持续多久才发出警报*/
     },
     "condition": {
-      "last": "30s",
       /*统计最近多久的时间*/
-      "method": "avg",
+      "last": "30s",
       /*支持 max,min,avg,median,stdDev,count,sum等*/
-      "op": ">=",
+      "method": "avg",
       /*比较符， 支持 >,>=,<,<=,=等等*/
-      "threshold": "3"
+      "op": ">=",
       /*比较的目标值*/
+      "threshold": 3
     },
     "alert": {
-      "method": "WecomBot",
       /*目前只支持WecomBot企业微信bot，和Log只打日志*/
+      "method": "WecomBot",
       "times": 3,
       "interval": "90s",
       "config": {
         "token": "xxxxxxxxxxxx",
         /*bot的token*/
         "message": "SchedulerError最近90s出现3次以上"
-        /*自定义的消息*/
       }
     }
   }

@@ -2,7 +2,8 @@ package io.github.leibnizhu.vmonitor
 
 import com.codahale.metrics.SharedMetricRegistries
 import io.github.leibnizhu.vmonitor.Constants.{ALERT_RULE_CONFIG_KEY, ENVIRONMENT_CONFIG_KEY, MAIN_METRIC_NAME}
-import io.github.leibnizhu.vmonitor.NeedAlert.{AlertBegin, AlertEnd, NoNeed}
+import io.github.leibnizhu.vmonitor.NeedAlert.{AlertBegin, AlertEnd, NeedAlert, NoNeed}
+import io.github.leibnizhu.vmonitor.util.FutureUtil._
 import io.vertx.core.shareddata.SharedData
 import io.vertx.core.{AbstractVerticle, Promise}
 import org.apache.commons.lang3.StringUtils
@@ -38,9 +39,9 @@ class MetricsVerticle extends AbstractVerticle {
     val periodicMs = rule.checkPeriodMs
     rule.initMetric(metricRegistry)
     val fsm = new AlertCheckFsm(rule, sd).init()
-    vertx.setPeriodic(periodicMs, _ => {
+    vertx.setPeriodic(periodicMs, (tid: java.lang.Long) => {
       val satisfiedAlertCond = rule.judgeAlertCond(metricRegistry)
-      fsm.check(satisfiedAlertCond).onSuccess({
+      fsm.check(satisfiedAlertCond).onSuccess((n: NeedAlert) => n match {
         case AlertBegin => rule.doAlert(alerting = true, env, vertx)
         case AlertEnd => rule.doAlert(alerting = false, env, vertx)
         case NoNeed =>

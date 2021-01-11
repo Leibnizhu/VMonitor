@@ -91,15 +91,16 @@ object AlertRule {
       .filter(rule => rule.alert.method == "WecomBot")
       .map(rule => Option(rule.alert).map(_.config).flatMap(_.get("token")).orNull)
       .filter(_ != null)
+      .toList.distinct
 }
 
 case class MonitorMetric(@JsonProperty(required = true) name: String,
                          @JsonProperty(required = false) filter: List[FilterCondition] = null,
                          @JsonProperty(required = false) groupField: List[String] = null,
-                         @JsonProperty(required = false) groupAggFunc: String,
-                         @JsonProperty(required = false) groupAggField: String,
+                         @JsonProperty(required = false) groupAggFunc: String = null,
+                         @JsonProperty(required = false) groupAggField: String = null,
                          @JsonProperty(required = true) sampleInterval: String,
-                         @JsonProperty(required = false) sampleAggField: String,
+                         @JsonProperty(required = false) sampleAggField: String = null,
                          @JsonProperty(required = true) sampleAggFunc: String) {
   def validate(): Unit = {
     if (groupField != null && groupField.nonEmpty) {

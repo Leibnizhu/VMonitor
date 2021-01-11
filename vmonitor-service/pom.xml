@@ -124,13 +124,8 @@
                                 <transformer
                                         implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <manifestEntries>
-                                        <Main-Class>io.github.leibnizhu.vmonitor.MainLauncher</Main-Class>
-                                        <Main-Verticle>io.github.leibnizhu.vmonitor.http.HttpVerticle</Main-Verticle>
+                                        <Main-Class>io.github.leibnizhu.vmonitor.StandAloneService</Main-Class>
                                     </manifestEntries>
-                                </transformer>
-                                <transformer
-                                        implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
-                                    <resource>META-INF/services/io.vertx.core.spi.VerticleFactory</resource>
                                 </transformer>
                             </transformers>
                             <artifactSet>

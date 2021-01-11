@@ -1,3 +1,5 @@
+## 实例JSON
+```json
 [
   {
     "name": "SchedulerError监控",
@@ -34,10 +36,11 @@
       "times": 3,
       "interval": "90s",
       "config": {
-        "token": "xxxxxxxxxxxx",
-        /*bot的token*/
+        "token": "xxxxxxxxx",
+        /*自定义的消息*/
         "message": "SchedulerError最近90s出现3次以上"
       }
     }
   }
 ]
+```

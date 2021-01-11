@@ -1,6 +1,7 @@
 package io.github.leibnizhu.vmonitor
 
 import com.hazelcast.config.Config
+import io.github.leibnizhu.vmonitor.Constants.EVENTBUS_MONITOR_JSON_PARAM_METRIC_NAME
 import io.github.leibnizhu.vmonitor.util.FutureUtil
 import io.vertx.core.json.JsonObject
 import io.vertx.core.{Promise, Vertx}
@@ -40,4 +41,13 @@ object VMonitor {
 
   def specifyVertx(address: String, env: String, ruleStr: String, vertx: Vertx): VMonitor =
     new VMonitorEndpoint(address, env, ruleStr, vertx = vertx)
+
+
+  def collect(address: String, metricName: String, message: JsonObject, vertx: Vertx): Unit = {
+    if (vertx == null) {
+      throw new IllegalStateException("vertx is not initialized!!!")
+    }
+    message.put(EVENTBUS_MONITOR_JSON_PARAM_METRIC_NAME, metricName)
+    vertx.eventBus().publish(address, message) //这里要publish给所有节点
+  }
 }

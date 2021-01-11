@@ -16,7 +16,7 @@ public class JavaEntranceTest {
 
     @Test
     public void clusterTest() throws Exception {
-        String ruleStr = Vertx.vertx().fileSystem().readFileBlocking("rule.json").toString();
+        String ruleStr = "[{\"name\":\"SchedulerError监控\",\"metric\":{\"name\":\"serv-etl.SchedulerError\",\"filter\":[],\"groupField\":[],\"groupAggFunc\":null,\"groupAggField\":\"key\",\"sampleInterval\":\"1m\",\"sampleAggFunc\":\"uniqueCount\",\"sampleAggField\":\"cost\"},\"period\":{\"every\":\"10s\",\"pend\":\"10s\"},\"condition\":{\"last\":\"30s\",\"method\":\"avg\",\"op\":\">=\",\"threshold\":3},\"alert\":{\"method\":\"WecomBot\",\"times\":3,\"interval\":\"90s\",\"config\":{\"token\":\"ab8bc9f4-573c-452d-9908-1db60ce326e7\",\"message\":\"SchedulerError最近90s出现3次以上\"}}}]";
         VMonitor endpoint1 = runOne(ruleStr);
         TimeUnit.SECONDS.sleep(10);
         VMonitor endpoint2 = runOne(ruleStr);

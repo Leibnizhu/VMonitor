@@ -103,17 +103,6 @@ class VMonitorEndpoint(address: String, env: String = "default", ruleStr: String
   }
 
   override def collect(metricName: String, message: JsonObject): Unit = {
-    if (vertx == null) {
-      throw new IllegalStateException("vertx is not initialized!!!")
-    }
-    message.put(EVENTBUS_MONITOR_JSON_PARAM_METRIC_NAME, metricName)
-    vertx.eventBus().publish(address, message) //这里要publish给所有节点
-    //      .onSuccess((msg: Message[JsonObject]) => {
-    //        if (msg.body() != null)
-    //          log.info("Eventbus返回:{}", msg.body())
-    //      })
-    //      .onFailure((e: Throwable) => {
-    //        log.error("Eventbus返回:异常", e)
-    //      })
+    VMonitor.collect(address, metricName, message, vertx)
   }
 }

@@ -134,10 +134,15 @@ case class MonitorMetric(@JsonProperty(required = true) name: String,
   private def doAgg(aggFunc: String, aggValueList: Iterable[Any]): Long = aggFunc.toLowerCase match {
     case "uniquecount" => aggValueList.toList.distinct.size
     case "count" => aggValueList.size
-    case "min" => aggValueList.map(safeToLong).filter(_ != null).min
-    case "max" => aggValueList.map(safeToLong).filter(_ != null).max
+    case "min" =>
+      val points = aggValueList.map(safeToLong).filter(_ != null)
+      if (points.nonEmpty) points.min else 0
+    case "max" =>
+      val points = aggValueList.map(safeToLong).filter(_ != null)
+      if (points.nonEmpty) points.max else 0
     case "sum" => aggValueList.map(safeToLong).filter(_ != null).map(Long.unbox(_)).sum
-    case "avg" => aggValueList.map(safeToLong).filter(_ != null).map(Long.unbox(_)).sum / aggValueList.size
+    case "avg" => if (aggValueList.isEmpty) 0 else
+      aggValueList.map(safeToLong).filter(_ != null).map(Long.unbox(_)).sum / aggValueList.size
     case _ =>
       log.error("监控规则中出现了不支持的采样聚合函数:" + aggFunc)
       0

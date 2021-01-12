@@ -3,7 +3,7 @@ package io.github.leibnizhu.vmonitor
 import com.codahale.metrics.MetricRegistry.MetricSupplier
 import com.codahale.metrics._
 import com.fasterxml.jackson.annotation.JsonProperty
-import io.github.leibnizhu.vmonitor.AlertRule.{log, supportAlertAggFunc, supportAlertOp, supportMetricAggFunc}
+import io.github.leibnizhu.vmonitor.AlertRule.{log, safeToDouble, safeToLong, supportAlertAggFunc, supportAlertOp, supportMetricAggFunc}
 import io.github.leibnizhu.vmonitor.Constants.SEND_WECOM_BOT_EVENTBUS_ADDR
 import io.github.leibnizhu.vmonitor.util.{SystemUtil, TimeUtil}
 import io.github.leibnizhu.vmonitor.wecom.message.MarkdownMessage
@@ -15,6 +15,8 @@ import org.json4s._
 import org.json4s.jackson.JsonMethods.parse
 import org.slf4j.{Logger, LoggerFactory}
 
+import java.lang
+import java.util.regex.Pattern
 import scala.util.Try
 
 /**
@@ -32,6 +34,7 @@ case class AlertRule(@JsonProperty(required = true) name: String,
   lazy val alertCounterName = s"$name:alert:counter" //当前连续报警多少次
   lazy val alertFsmMapName = s"$name:alert:fsm:map" //fsm保存上下文的分布式map名
   lazy val alertFsmLockName = s"$name:alert:fsm:lock" //fsm的处理锁
+  lazy val histogramName = s"${metric.name}.$name"
 
   def validate(): AlertRule = {
     metric.validate()
@@ -42,7 +45,7 @@ case class AlertRule(@JsonProperty(required = true) name: String,
   // 初始化指标Histogram
   def initMetric(metricRegistry: MetricRegistry): Unit = {
     val (time, unit) = TimeUtil.parseTimeStr(condition.last)
-    metricRegistry.histogram(metric.name, new MetricSupplier[Histogram]() {
+    metricRegistry.histogram(histogramName, new MetricSupplier[Histogram]() {
       override def newMetric(): Histogram =
         new Histogram(if (time == 0) new UniformReservoir() else new SlidingTimeWindowReservoir(time, unit))
     })
@@ -52,20 +55,20 @@ case class AlertRule(@JsonProperty(required = true) name: String,
   def recordMetric(sampledList: List[JsonObject], metricRegistry: MetricRegistry): Unit = {
     val sampleValue = metric.sample(sampledList)
     if (log.isDebugEnabled) {
-      log.debug(s"======>${metric.name}指标采样源:${sampledList}使用规则:${metric}最终采样值:$sampleValue")
+      log.debug(s"======>'${metric.name}'指标在${name}规则采样源:${sampledList}使用规则:${metric}最终采样值:$sampleValue")
     }
-    metricRegistry.histogram(metric.name).update(sampleValue)
+    metricRegistry.histogram(histogramName).update(sampleValue)
   }
 
   // 根据 AlertCondition 处理
   def judgeAlertCond(metricRegistry: MetricRegistry): Boolean = {
-    val snapshot = metricRegistry.histogram(metric.name).getSnapshot
+    val snapshot = metricRegistry.histogram(histogramName).getSnapshot
     if (log.isDebugEnabled) {
-      log.debug(s"======>${metric.name}指标监控窗口:${snapshot.getValues.mkString("Array(", ", ", ")")}")
+      log.debug(s"======>'${metric.name}'指标在${name}规则的监控窗口:${snapshot.getValues.mkString("Array(", ", ", ")")}")
     }
     val satisfied = condition.compare(condition.metricValue(snapshot))
     if (log.isDebugEnabled) {
-      log.debug(s"======>${metric.name}指标的$condition${if (satisfied) "满足" else "暂不满足"}")
+      log.debug(s"======>'${metric.name}'指标在${name}规则的$condition${if (satisfied) "满足" else "暂不满足"}")
     }
     satisfied
   }
@@ -92,6 +95,22 @@ object AlertRule {
       .map(rule => Option(rule.alert).map(_.config).flatMap(_.get("token")).orNull)
       .filter(_ != null)
       .toList.distinct
+
+  def safeToLong(v: Any): java.lang.Long = v match {
+    case l: Long => l
+    case i: Int => i
+    case d: Double => d.toLong
+    case f: Float => f.toLong
+    case _ => Try(Long.box(v.toString.toLong)).getOrElse(null)
+  }
+
+  def safeToDouble(v: Any): java.lang.Double = v match {
+    case l: Long => l.toDouble
+    case i: Int => i.toDouble
+    case d: Double => d
+    case f: Float => f.toDouble
+    case _ => Try(Double.box(v.toString.toDouble)).getOrElse(null)
+  }
 }
 
 case class MonitorMetric(@JsonProperty(required = true) name: String,
@@ -148,27 +167,33 @@ case class MonitorMetric(@JsonProperty(required = true) name: String,
       0
   }
 
-  private def safeToLong(v: Any): java.lang.Long = v match {
-    case l: Long => l
-    case i: Int => i
-    case d: Double => d.toLong
-    case f: Float => f.toLong
-    case _ => Try(Long.box(v.toString.toLong)).getOrElse(null)
-  }
-
-  override def toString: String = s"每${sampleInterval}采样按${filter}过滤,按${groupField}分组后$groupAggFunc($groupAggField),最后所有分组$sampleAggFunc($sampleAggField)"
+  override def toString: String =
+    s"每${sampleInterval}采样" +
+      s"${if (filter != null && filter.nonEmpty) s"按${filter}过滤," else ""}" +
+      s"${if (groupField != null && groupField.nonEmpty) s"按${groupField}分组后$groupAggFunc($groupAggField),最后所有分组" else ""}" +
+      s"$sampleAggFunc($sampleAggField)"
 }
 
 case class FilterCondition(@JsonProperty(required = true) key: String,
                            @JsonProperty(required = true) op: String,
                            @JsonProperty(required = true) target: String) {
-  def satisfied(json: JsonObject): Boolean = op match {
-    case "=" =>
-      val value = json.getValue(key)
-      value != null && value.equals(target)
-    case _ =>
-      log.error("监控规则中出现了不支持的比较符:" + op)
-      false
+  lazy val targetDouble: lang.Double = safeToDouble(target)
+  lazy val targetReg: Pattern = Pattern.compile(target)
+
+  def satisfied(json: JsonObject): Boolean = {
+    val value = json.getValue(key)
+    val doubleValue = safeToLong(value)
+    op match {
+      case "=" => value != null && value.equals(target)
+      case ">" => doubleValue != null && doubleValue > targetDouble
+      case ">=" => doubleValue != null && doubleValue >= targetDouble
+      case "<" => doubleValue != null && doubleValue < targetDouble
+      case "<=" => doubleValue != null && doubleValue <= targetDouble
+      case "reg" => value != null && targetReg.matcher(value.toString).find()
+      case _ =>
+        log.error("监控规则中出现了不支持的比较符:" + op)
+        false
+    }
   }
 }
 

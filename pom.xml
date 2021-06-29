@@ -7,7 +7,7 @@
     <groupId>io.github.leibnizhu</groupId>
     <artifactId>vmonitor-parent</artifactId>
     <packaging>pom</packaging>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.0-vertx3.x-SNAPSHOT</version>
     <modules>
         <module>vmonitor-core</module>
         <module>vmonitor-service</module>
@@ -24,7 +24,7 @@
         <scala.main.version>2.10</scala.main.version>
         <scala.version>${scala.main.version}.5</scala.version>
         <scala-test.version>3.0.5</scala-test.version>
-        <vertx.version>4.0.0</vertx.version>
+        <vertx.version>3.9.2</vertx.version>
         <slf4j.version>1.7.24</slf4j.version>
         <logback.version>1.1.11</logback.version>
         <java.version>1.8</java.version>
@@ -217,4 +217,14 @@
             </distributionManagement>
         </profile>
     </profiles>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>versions-maven-plugin</artifactId>
+                <version>2.1</version>
+            </plugin>
+        </plugins>
+    </build>
 </project>

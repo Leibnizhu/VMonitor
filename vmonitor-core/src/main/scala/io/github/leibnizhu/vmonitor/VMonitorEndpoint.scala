@@ -32,16 +32,18 @@ class VMonitorEndpoint(address: String, env: String = "default", ruleStr: String
       val mgr = if (hazelcastConfig == null) new HazelcastClusterManager(new Config()) else new HazelcastClusterManager(hazelcastConfig) //创建ClusterManger对象
       val options = new VertxOptions().setClusterManager(mgr)
         .setBlockedThreadCheckInterval(1).setBlockedThreadCheckIntervalUnit(TimeUnit.MINUTES) //设置到Vertx启动参数中
-      Vertx.clusteredVertx(options)
-        .onSuccess((vertx: Vertx) => {
+      Vertx.clusteredVertx(options, (vertxAr: AsyncResult[Vertx]) => {
+        if (vertxAr.succeeded()) {
+          val vertx = vertxAr.result()
           this.vertx = vertx
           log.info("启动集群模式的Vertx成功,deploymentIDs:{}", vertx.deploymentIDs())
           initVMonitor(vertx, startPromise, mgr)
-        })
-        .onFailure((exp: Throwable) => {
+        } else {
+          val exp = vertxAr.cause()
           log.error("启动集群模式的Vertx失败:" + exp.getMessage, exp)
           startPromise.fail(exp)
-        })
+        }
+      })
     } else {
       initVMonitor(vertx, startPromise)
     }
@@ -50,14 +52,18 @@ class VMonitorEndpoint(address: String, env: String = "default", ruleStr: String
   private def initVMonitor(vertx: Vertx, startPromise: Promise[Void], mgr: HazelcastClusterManager = null) = {
     val deployConfig = new JsonObject().put(LISTEN_ADDRESS_CONFIG_KEY, address).put(ENVIRONMENT_CONFIG_KEY, env).put(ALERT_RULE_CONFIG_KEY, ruleStr)
     val deployOption = new DeploymentOptions().setConfig(deployConfig)
+    val futures = List.fill(3)(Promise.promise[String]())
+    vertx.deployVerticle(classOf[EventCollectorVerticle], deployOption, futures.head)
+    vertx.deployVerticle(classOf[MetricsVerticle], deployOption, futures(1))
+    vertx.deployVerticle(classOf[SendWecomBotVerticle], deployOption, futures(2))
     CompositeFuture
-      .all(vertx.deployVerticle(classOf[EventCollectorVerticle], deployOption),
-        vertx.deployVerticle(classOf[MetricsVerticle], deployOption),
-        vertx.deployVerticle(classOf[SendWecomBotVerticle], deployOption))
+      .all(futures.head.future(), futures(1).future(), futures(2).future())
       .onSuccess((f: CompositeFuture) => {
         log.info("VMonitorEndpoint部署Verticle成功")
-        this.endpoint = if (mgr == null) SystemUtil.hostName() else
-          s"${SystemUtil.hostName()}@${mgr.getNodeInfo.host()}:${mgr.getNodeInfo.port()}"
+        this.endpoint = if (mgr == null) SystemUtil.hostName() else {
+          val localAddr = mgr.getHazelcastInstance.getCluster.getLocalMember.getAddress
+          s"${SystemUtil.hostName()}@${localAddr.getHost}:${localAddr.getPort}"
+        }
         notifyAndRegisterHook(rules)
         startPromise.complete()
       })
@@ -73,7 +79,7 @@ class VMonitorEndpoint(address: String, env: String = "default", ruleStr: String
       val startMarkdownStr = makeMarkdownMessage(endpoint, "info", "启动")
       wecomBotTokens.foreach(token => {
         val wecomMsgJson = MarkdownMessage(token, startMarkdownStr).serializeToJsonObject()
-        vertx.eventBus().request(SEND_WECOM_BOT_EVENTBUS_ADDR, wecomMsgJson)
+        vertx.eventBus().request(SEND_WECOM_BOT_EVENTBUS_ADDR, wecomMsgJson, (_: AsyncResult[Message[JsonObject]]) => {})
       })
     }
   }
@@ -94,8 +100,8 @@ class VMonitorEndpoint(address: String, env: String = "default", ruleStr: String
       val stopMarkdownStr = makeMarkdownMessage(endpoint, "warning", "关闭")
       wecomBotTokens.foreach(token => {
         val wecomMsgJson = MarkdownMessage(token, stopMarkdownStr).serializeToJsonObject()
-        vertx.eventBus().request[JsonObject](SEND_WECOM_BOT_EVENTBUS_ADDR, wecomMsgJson)
-          .onComplete((_: AsyncResult[Message[JsonObject]]) => vertx.close(stopPromise))
+        vertx.eventBus().request[JsonObject](SEND_WECOM_BOT_EVENTBUS_ADDR, wecomMsgJson,
+          (_: AsyncResult[Message[JsonObject]]) => vertx.close(stopPromise))
       })
     } else {
       vertx.close(stopPromise)

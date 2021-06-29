@@ -8,8 +8,9 @@ import io.github.leibnizhu.vmonitor.Constants.SEND_WECOM_BOT_EVENTBUS_ADDR
 import io.github.leibnizhu.vmonitor.util.{SystemUtil, TimeUtil}
 import io.github.leibnizhu.vmonitor.wecom.message.MarkdownMessage
 import io.github.leibnizhu.vmonitor.wecom.message.MarkdownMessage.MarkdownBuilder
+import io.vertx.core.eventbus.Message
 import io.vertx.core.json.JsonObject
-import io.vertx.core.{Future, Vertx}
+import io.vertx.core.{AsyncResult, Future, Handler, Vertx}
 import org.apache.commons.lang3.StringUtils
 import org.json4s._
 import org.json4s.jackson.JsonMethods.parse
@@ -219,7 +220,11 @@ case class AlertMode(@JsonProperty(required = true) method: String,
         messageBuilder.quoted().text(customMsg)
       }
       val wecomMsgJson = MarkdownMessage(token, messageBuilder.toMarkdownString).serializeToJsonObject()
-      vertx.eventBus().request(SEND_WECOM_BOT_EVENTBUS_ADDR, wecomMsgJson).mapEmpty()
+      vertx.eventBus().request(SEND_WECOM_BOT_EVENTBUS_ADDR, wecomMsgJson, new Handler[AsyncResult[Message[JsonObject]]]() {
+        override def handle(event: AsyncResult[Message[JsonObject]]): Unit = {
+        }
+      })
+      Future.succeededFuture()
     case "Log" =>
       log.warn("===============>{}环境的{}规则{}告警", Array(env, rule.name, if (alerting) "发出" else "解除"): _*)
       Future.succeededFuture()

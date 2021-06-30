@@ -111,4 +111,8 @@ class VMonitorEndpoint(address: String, env: String = "default", ruleStr: String
   override def collect(metricName: String, message: JsonObject): Unit = {
     VMonitor.collect(address, metricName, message, vertx)
   }
+
+  override def collect(metricName: String, message: String): Unit = {
+    collect(metricName, new JsonObject(message))
+  }
 }

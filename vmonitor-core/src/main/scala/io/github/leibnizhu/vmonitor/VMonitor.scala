@@ -29,6 +29,8 @@ trait VMonitor {
   }
 
   def collect(metricName: String, message: JsonObject): Unit
+
+  def collect(metricName: String, message: String): Unit
 }
 
 object VMonitor {

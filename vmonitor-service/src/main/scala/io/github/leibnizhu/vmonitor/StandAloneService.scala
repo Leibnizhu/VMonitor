@@ -2,11 +2,11 @@ package io.github.leibnizhu.vmonitor
 
 
 import io.github.leibnizhu.vmonitor.util.FutureUtil._
-import io.vertx.core.Vertx
 import io.vertx.core.buffer.Buffer
 import io.vertx.core.cli.{CLI, Option}
 import io.vertx.core.http.{HttpServer, HttpServerRequest}
 import io.vertx.core.json.JsonObject
+import io.vertx.core.{AsyncResult, Vertx}
 import org.apache.commons.lang3.StringUtils
 import org.slf4j.LoggerFactory
 
@@ -43,23 +43,28 @@ object StandAloneService {
           val resp = req.response()
           val uri = req.uri()
           val metric = uri.substring(uri.lastIndexOf("/") + 1)
-          req.body()
-            .onSuccess((buf: Buffer) => {
-              if (buf.length() > 0) {
-                VMonitor.collect(address, metric, new JsonObject(buf), vertx)
-                resp.end("success")
-              } else {
-                resp.end("empty request body")
-              }
-            })
-            .onFailure((e: Throwable) => {
-              log.error(e.getMessage, e)
-              resp.end("failed:" + e.getMessage)
-            })
+          req.bodyHandler((buf: Buffer) => {
+            if (buf.length() > 0) {
+              VMonitor.collect(address, metric, new JsonObject(buf), vertx)
+              resp.end("success")
+            } else {
+              resp.end("empty request body")
+            }
+          })
+          //            .onSuccess((buf: Buffer) => {
+          //            })
+          //            .onFailure((e: Throwable) => {
+          //              log.error(e.getMessage, e)
+          //              resp.end("failed:" + e.getMessage)
+          //            })
         })
-        .listen(portStr.toInt)
-        .onSuccess((_: HttpServer) => log.info("监听{}端口的HTTP服务器启动成功", portStr))
-        .onFailure((e: Throwable) => log.error("监听{}端口的HTTP服务器失败，原因：{}", Array(portStr, e.getLocalizedMessage): _*))
+        .listen(portStr.toInt, (listenAr: AsyncResult[HttpServer]) => {
+          if (listenAr.succeeded()) {
+            log.info("监听{}端口的HTTP服务器启动成功", portStr)
+          } else {
+            log.error("监听{}端口的HTTP服务器失败，原因：{}", Array(portStr, listenAr.cause().getLocalizedMessage): _*)
+          }
+        })
     }
     Runtime.getRuntime.addShutdownHook(new Thread(new Runnable {
       override def run(): Unit = {

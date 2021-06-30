@@ -44,16 +44,28 @@
             <artifactId>commons-lang3</artifactId>
         </dependency>
 
+        <!--        <dependency>-->
+        <!--            <groupId>org.json4s</groupId>-->
+        <!--            <artifactId>json4s-jackson_${scala.main.version}</artifactId>-->
+        <!--        </dependency>-->
+
         <dependency>
-            <groupId>org.json4s</groupId>
-            <artifactId>json4s-jackson_${scala.main.version}</artifactId>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.10.2</version>
         </dependency>
 
-<!--        <dependency>-->
-<!--            <groupId>org.slf4j</groupId>-->
-<!--            <artifactId>slf4j-api</artifactId>-->
-<!--            <scope>provided</scope>-->
-<!--        </dependency>-->
+        <dependency>
+            <groupId>com.fasterxml.jackson.module</groupId>
+            <artifactId>jackson-module-scala_2.12</artifactId>
+            <version>2.10.2</version>
+        </dependency>
+
+        <!--        <dependency>-->
+        <!--            <groupId>org.slf4j</groupId>-->
+        <!--            <artifactId>slf4j-api</artifactId>-->
+        <!--            <scope>provided</scope>-->
+        <!--        </dependency>-->
 
         <dependency>
             <groupId>ch.qos.logback</groupId>
@@ -103,6 +115,7 @@
                         <jvmArg>-Xms1024m</jvmArg>
                         <jvmArg>-Xmx1024m</jvmArg>
                     </jvmArgs>
+                    <addScalacArgs>-target:jvm-1.8</addScalacArgs>
                 </configuration>
                 <executions>
                     <execution>
@@ -121,6 +134,43 @@
                             <goal>add-source</goal>
                             <goal>testCompile</goal>
                         </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.2.1</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <artifactSet>
+                                <includes>
+                                    <!--                                    <include>org.json4s:*</include>-->
+                                    <include>com.fasterxml.jackson*:*</include>
+                                </includes>
+                                <excludes>
+                                    <exclude>com:*</exclude>
+                                    <exclude>io.netty:*</exclude>
+                                    <exclude>io.vertx:*</exclude>
+                                </excludes>
+                            </artifactSet>
+                            <relocations>
+                                <!--<relocation>
+                                    <pattern>org.json4s</pattern>
+                                    <shadedPattern>io.github.leibnizhu.org.json4s</shadedPattern>
+                                </relocation>-->
+                                <relocation>
+                                    <pattern>com.fasterxml.jackson</pattern>
+                                    <shadedPattern>dependencies.com.fasterxml.jackson</shadedPattern>
+                                </relocation>
+                            </relocations>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

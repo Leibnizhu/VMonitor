@@ -3,7 +3,10 @@ package io.github.leibnizhu.vmonitor
 import com.codahale.metrics.MetricRegistry.MetricSupplier
 import com.codahale.metrics._
 import com.fasterxml.jackson.annotation.JsonProperty
-import io.github.leibnizhu.vmonitor.AlertRule.{log, safeToDouble, safeToLong, supportAlertAggFunc, supportAlertOp, supportMetricAggFunc}
+import com.fasterxml.jackson.core.JsonParser
+import com.fasterxml.jackson.databind.{ObjectMapper, ObjectReader}
+import com.fasterxml.jackson.module.scala.{DefaultScalaModule, ScalaObjectMapper}
+import io.github.leibnizhu.vmonitor.AlertRule._
 import io.github.leibnizhu.vmonitor.Constants.SEND_WECOM_BOT_EVENTBUS_ADDR
 import io.github.leibnizhu.vmonitor.util.{SystemUtil, TimeUtil}
 import io.github.leibnizhu.vmonitor.wecom.message.MarkdownMessage
@@ -12,8 +15,6 @@ import io.vertx.core.eventbus.Message
 import io.vertx.core.json.JsonObject
 import io.vertx.core.{AsyncResult, Future, Handler, Vertx}
 import org.apache.commons.lang3.StringUtils
-import org.json4s._
-import org.json4s.jackson.JsonMethods.parse
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.lang
@@ -84,11 +85,21 @@ object AlertRule {
   val supportAlertAggFunc = Set("uniquecount", "count", "min", "max", "sum", "avg", "stddev", "median")
   val supportAlertOp = Set(">", ">=", "<", "<=", "=")
 
-  implicit val formats: DefaultFormats.type = DefaultFormats
 
-  def apply(json: String): AlertRule = parse(json).extract[AlertRule]
+  protected lazy val mapper: ObjectMapper = (new ObjectMapper() with ScalaObjectMapper)
+    .registerModule(DefaultScalaModule).configure(JsonParser.Feature.ALLOW_COMMENTS, true)
+  protected lazy val objectReader: ObjectReader = mapper.readerFor(classOf[AlertRule])
+  protected lazy val objectListReader: ObjectReader = mapper.readerFor(classOf[Array[AlertRule]])
 
-  def fromListJson(listJson: String): Array[AlertRule] = parse(listJson).extract[Array[AlertRule]]
+  def apply(json: String): AlertRule = objectReader.readValue[AlertRule](json)
+
+  def fromListJson(listJson: String): Array[AlertRule] = objectListReader.readValue(listJson)
+
+  //  implicit val formats: DefaultFormats.type = DefaultFormats
+  //
+  //  def apply(json: String): AlertRule = parse(json).extract[AlertRule]
+  //
+  //  def fromListJson(listJson: String): Array[AlertRule] = parse(listJson).extract[Array[AlertRule]]
 
   def allWecomBotToken(rules: Iterable[AlertRule]): Iterable[String] =
     rules
@@ -199,7 +210,9 @@ case class FilterCondition(@JsonProperty(required = true) key: String,
 }
 
 case class CheckPeriod(@JsonProperty(required = true) every: String,
-                       @JsonProperty(required = true) pend: String)
+                       @JsonProperty(required = true) pend: String) {
+
+}
 
 case class AlertMode(@JsonProperty(required = true) method: String,
                      @JsonProperty(required = true) times: Int,

@@ -59,6 +59,7 @@
                         <jvmArg>-Xms1024m</jvmArg>
                         <jvmArg>-Xmx1024m</jvmArg>
                     </jvmArgs>
+<!--                    <addScalacArgs>-target:jvm-1.8</addScalacArgs>-->
                 </configuration>
                 <executions>
                     <execution>
